@@ -1,0 +1,232 @@
+---
+title: "St. Helens Data"
+output: html_document
+date: "2024-01-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readxl)
+library(tidyverse)
+library(ggplot2)
+library(rio)
+library(ggExtra)
+library(ggcorrplot)
+```
+
+# Analyte omissions
+
+## benz[a]anthracene
+## benz[j] and [e]aceanthrylene
+## 2,6-dimethylnaphthalene
+## 2,6-diethylnaphthalene
+
+
+# Problematic samples
+
+## Reccommend Sensitivity Analysis
+### SH019_A_03
+### SH007_A_06
+
+## Omit
+### SH044_WB_08
+### SH045_WB_08
+
+
+# Aims
+
+## 1.	Ascertain local outdoor features that contribute to personal PAH exposure. 
+##	2.  Explore the influence of demographics and personal habits on total PAH exposure.
+## 3.	Compare changes in outdoor air to changes in personal PAH exposures.
+
+# Hypotheses
+
+## 1.	PAH quantities and profiles captured in personal silicone wristband samplers depend on their housing characteristics, their time-activity patterns, and outdoor PAH contributions.
+## 2.	Changes in outdoor vapor-phase air PAHs proportionally influences PAHs found in personal silicone wristband samples.
+
+
+# Load in all data from the deidentified data book 
+
+```{r}
+Data_list <- import_list("SHAirData_Deidentified.xlsx")
+```
+
+# Rename each sheet as individual dataframes
+
+```{r}
+monthly_meta <- Data_list$monthly_meta
+part <- Data_list$participants
+comm_coord <- Data_list$community_samples
+WBD <- Data_list$chemical_data_WB
+AirD <- Data_list$chemical_data_Air
+EnvD <- Data_list$environmental_data
+```
+
+# Clean Up WB Data
+
+```{r}
+#WB data currently in ng/g
+(WB_clean <- WBD %>%
+  filter(Name != "SH044_WB_08",
+         Name != "SH045_WB_08") %>% #samples to omit
+   filter(ParameterName != "benz[a]anthracene",
+          ParameterName != "benz[j] and [e]aceanthrylene",
+          ParameterName != "2,6-dimethylnaphthalene",
+          ParameterName != "2,6-diethylnaphthalene") %>% #analytes to omit
+  separate(Name, into = c("ID", "Type", "Month")) %>%
+  select(ID, Month, ParameterName, Result, Flag) %>%
+  mutate(Flag = replace_na(Flag, "D")) %>% #D represents detections; easier to work with than NA values
+  filter(Flag != "U"))
+```
+
+
+# Data Visualization - data distributions and heatmaps
+
+```{r}
+# concentration distributions by chemical and month
+WB_clean %>%
+  ggplot(aes(y=reorder(ParameterName, Result), x=Result)) +
+  geom_point() +
+  facet_grid(cols = vars(Month)) +
+  scale_x_log10() +
+  theme_bw() 
+
+# median ng/g heatmap
+WB_clean %>%
+  group_by(Month, ParameterName) %>%
+  summarize(median = median(Result)) %>%
+  ggplot(aes(y=reorder(ParameterName, median), x=Month, fill = median)) + #sorted by detections
+  geom_tile( color = "white", lwd = 0.2, linetype = 1) +
+  scale_fill_viridis_c(trans = "log10") +
+  coord_fixed()
+
+# mean ng/g heatmap
+WB_clean %>%
+  group_by(Month, ParameterName) %>%
+  summarize(mean = mean(Result)) %>%
+  ggplot(aes(y=reorder(ParameterName, mean), x=Month, fill = mean)) + #sorted by detections
+  geom_tile( color = "white", lwd = 0.2, linetype = 1) +
+  scale_fill_viridis_c(trans = "log10") +
+  coord_fixed()
+
+# detection frequency
+WB_clean %>%
+  group_by(Month, ParameterName) %>%
+  summarize(mean = mean(Result), n = n()) %>%
+  mutate(det_freq = n/max(n)) %>% #calculate detection frequency
+  ggplot(aes(y=reorder(ParameterName, mean), x=Month, fill = det_freq)) + #sorted by detections
+  geom_tile( color = "white", lwd = 0.2, linetype = 1) +
+  scale_fill_viridis_c() +
+  coord_fixed()
+
+```
+
+# Data Visualization - stacked bar chart
+
+```{r}
+#stacked bar chart; limit to 50% detection rate
+#23 chemicals detected in at least 50%
+
+pal <- c("#5A5156", "#E4E1E3", "#1C7F93", "#1CBE4F", "#B5EFB5", 
+           "#3283FE", "#FEAF16", "#B00068", "#1CFFCE", "#90AD1C", 
+           "#DEA0FD", "#F8A19F", "#325A9B", "#C4451C", "#1C8356", 
+           "#85660D", "#FBE426", "#683B79", "#822E1C", 
+           "#F7E1A0", "#C075A6", "#BDCDFF", 
+           "#7ED7D1", "#2ED9FF", "#66B0FF", "#3B00FB")
+
+# stacked means (ng/g)
+WB_clean %>% #this is mean concentrations (ng/g) not sum!!
+  group_by(Month, ParameterName) %>%
+  summarize(mean = mean(Result), sd = sd(Result), n = n()) %>%
+  mutate(det_freq = n/max(n)) %>%
+  filter(det_freq > .5) %>% #at least 50% detection rate
+  ggplot(aes(x=Month, y= mean, fill = reorder(ParameterName, mean))) +
+  geom_bar(position = "stack", stat = "identity") +
+  scale_fill_discrete(type  = pal) +
+  theme_bw() 
+
+# stacked medians (ng/g)
+WB_clean %>% #this is median concentrations (ng/g) not sum!!
+  group_by(Month, ParameterName) %>%
+  summarize(mean = mean(Result), median = median(Result), sd = sd(Result), n = n()) %>%
+  mutate(det_freq = n/max(n)) %>%
+  filter(det_freq > .5) %>%
+  ggplot(aes(x=Month, y= median, fill = reorder(ParameterName, median))) +
+  geom_bar(position = "stack", stat = "identity") +
+  scale_fill_discrete(type  = pal) +
+  theme_bw() 
+
+```
+
+# Data Visualization - Correlation of chemicals
+
+```{r}
+# First convert data to a matrix with "NA" values for BLOD instances where each row is an analyte (5+ detections) and each row is a different WB sample (at least one detection).
+
+(five_dets <- WB_clean %>%
+  count(ParameterName) %>%
+  filter(n>4)) 
+
+chemical_list <- as.vector(five_dets$ParameterName) # save the list of analytes with 5 or more detections (45 analytes)
+
+WB_clean_five_dets <- subset(WB_clean, ParameterName %in% chemical_list) # create a new WB dataset with only the list of analytes saved above
+
+WB_clean_wide <- WB_clean_five_dets %>%
+  select(-Flag) %>%
+  pivot_wider(names_from = ParameterName, values_from = Result)
+
+WB_clean_wide <- as.data.frame(WB_clean_wide)
+row.names(WB_clean_wide) <- paste(WB_clean_wide$ID, WB_clean_wide$Month, sep="_")
+WB_mat_ready <- WB_clean_wide %>%
+  select(-ID, -Month)
+
+(WB_mat <- as.matrix(WB_mat_ready))
+
+# Create a correlation matrix and plot
+
+WB_chem_corr <- cor(WB_mat, use="pairwise.complete.obs")
+ggcorrplot(WB_chem_corr, type = "lower") #simple
+ggcorrplot(WB_chem_corr, hc.order = TRUE, type = "lower") # uses clustering to re-order chemicals
+
+```
+
+
+# Quick Look into outliers (looks like mostly in group 1)
+
+```{r}
+# 1. filter data by any concentrations above 500 and 1000 ng/g
+
+WB_clean %>% 
+  filter(Result > 1000) #SH018 in 02 and 04 - verify data, followed by SH048_06
+WB_clean %>% 
+  filter(Result > 500) #SH018 in 06 and 08; SH048_06 again; phenanthrene for SH044 and 45 in 04
+
+# 2. compare distributions with SH018 samples (all months) omitted
+
+WB_clean %>%
+  filter(ID != "SH018") %>%
+  ggplot(aes(y=reorder(ParameterName, Result), x=Result)) +
+  geom_point() +
+  facet_grid(cols = vars(Month)) +
+  scale_x_log10() +
+  theme_bw() #visually confirms almost all of the outlying points belonged to SH018
+
+# 3. compare distributions with SH018 samples (all months) and SH048_06 omitted
+
+WB_clean %>%
+  filter(ID != "SH018",
+         ID != "SH048") %>%
+  ggplot(aes(y=reorder(ParameterName, Result), x=Result)) +
+  geom_point() +
+  facet_grid(cols = vars(Month)) +
+  scale_x_log10(breaks = c(1,10,100,1000),    
+    limits = c(0.1,900)) +
+  theme_bw() 
+
+# 4. Dig into the questionnaire data for these participants a little
+
+part %>%
+  filter(ID == "SH018") # No obvious explanation. Does not smoke, old house (1930's), reported odor, has AC, no air freshener, gas stove, retired. Look at location.
+
+```
