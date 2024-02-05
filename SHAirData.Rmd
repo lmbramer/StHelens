@@ -1,0 +1,80 @@
+---
+title: "SHAirData"
+output: html_document
+date: "2024-02-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readxl)
+library(tidyverse)
+library(ggplot2)
+library(rio)
+library(ggExtra)
+```
+
+## Analyte omissions - air and wristbands
+
+# benz[a]anthracene
+# benz[j] and [e]aceanthrylene
+# 2,6-dimethylnaphthalene
+# 2,6-diethylnaphthalene
+
+## Potential sample issues 
+# SH004_A_04
+# SH003_WB_08
+# SH007_A_08
+
+## Reccommend Sensitivity Analysis 
+### SH019_A_03
+### SH007_A_06
+
+## Omit
+### SH044_WB_08
+### SH045_WB_08
+
+
+## Load in all data from the deidentified data book copy in the share drive
+
+```{r}
+Data_list <- import_list("SHAirData_Deidentified.xlsx")
+```
+
+## Rename each sheet as individual dataframes
+
+```{r}
+monthly_meta <- Data_list$monthly_meta
+part <- Data_list$participants
+comm_coord <- Data_list$community_samples
+WBD <- Data_list$chemical_data_WB
+AirD <- Data_list$chemical_data_Air
+EnvD <- Data_list$environmental_data
+chem_info <- Data_list$chemical_parameter
+```
+
+## Cleaning up and annotating the air data
+
+```{r}
+Air_clean <- AirD %>%
+  mutate(Deployed_by = ifelse(str_detect(Name, c("SH0")), "Participant", ifelse(str_detect(Name, "SMS_I|SHS"), "Teacher", "OSU"))) %>%
+  separate(Name, c("ID","X","Y")) %>% #splitting name to pull out ID and month; some samples have extra annotations for sample type (A) or outdoor(O)/indoor(I)
+  mutate(Indoor = ifelse(X == "I", "yes", "no")) %>% #identify indoor classroom sample (to omit from outdoor air analyses)
+  mutate(Month = ifelse(is.na(Y), X, Y)) %>% #extracting the month
+  mutate(Type = "A") %>% #all of the samples in this dataset are Air samples (A), opposed to wristbands (WB)
+  filter(ParameterName != "benz[a]anthracene",
+          ParameterName != "benz[j] and [e]aceanthrylene",
+          ParameterName != "2,6-dimethylnaphthalene",
+          ParameterName != "2,6-diethylnaphthalene") %>% #analytes to omit
+  select(ID, Type, Month, ParameterName, Result, Flag, Indoor, Deployed_by) %>%
+  mutate(Flag = replace_na(Flag, "D")) #D represents detections without J or B flags; U-flags were below detection limits
+
+# Samples collected per time point:
+Air_clean %>%
+  select(ID, Month, Deployed_by) %>%
+  distinct() %>%
+  group_by(Month, Deployed_by) %>%
+  summarize(n()) %>%
+  pivot_wider(names_from = Deployed_by, values_from = 'n()')
+
+```
