@@ -77,4 +77,105 @@ Air_clean %>%
   summarize(n()) %>%
   pivot_wider(names_from = Deployed_by, values_from = 'n()')
 
+
+##Visualization of Air Data (Alison)
+
+
+```{r}
+# concentration distributions by chemical and month
+Air_clean %>%
+  ggplot(aes(y=reorder(ParameterName, Result), x=Result)) +
+  geom_point() +
+  facet_grid(cols = vars(Month)) +
+  scale_x_log10() +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle=90)) +
+  labs(x = "Concentration ng/m^3", y = "Chemical Detected")
+```
+```{r}
+# concentration distributions by chemical and month
+Air_clean2 <- Air_clean %>% filter(ID != "NW10",ID != "SW10", ID != "C" )
+
+Air_clean2 %>%
+  ggplot(aes(y=reorder(ParameterName, Result), x=Result)) +
+  geom_point() +
+  facet_grid(cols = vars(Month)) +
+  scale_x_log10() +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle=90)) +
+  labs(x = "Concentration ng/m^3", y = "Chemical Detected") 
+```
+
+```{r}
+# Units are ng/m^3
+# median heatmap
+Air_clean1 <- Air_clean %>% filter(Month != "01")
+Air_clean1 %>%
+  group_by(Month, ParameterName) %>%
+  summarize(Median = median(Result)) %>%
+  ggplot(aes(y=reorder(ParameterName, Median), x=Month, fill = Median)) + #sorted by detections
+  geom_tile( color = "white", lwd = 0.2, linetype = 1) +
+  scale_fill_viridis_c(trans = "log10") +
+  coord_fixed() +
+  labs(x = "Month", y = "Chemical Parameter Median Value ng/m^3")+
+  theme(axis.text.x = element_text(angle=90))
+
+# mean heatmap
+Air_clean1 %>%
+  group_by(Month, ParameterName) %>%
+  summarize(Mean = mean(Result), Median = median(Result)) %>%
+  ggplot(aes(y=reorder(ParameterName, Median), x=Month, fill = Mean)) + #sorted by detections
+  geom_tile( color = "white", lwd = 0.2, linetype = 1) +
+  scale_fill_viridis_c(trans = "log10") +
+  coord_fixed()+
+  labs(x = "Month", y = "Chemical Parameter Mean Value ng/m^3")+
+  theme(axis.text.x = element_text(angle=90))
+
+# detection frequency
+Air_clean1 %>%
+  group_by(Month, ParameterName) %>%
+  summarize(mean = mean(Result), Median = median(Result), n = n()) %>%
+  mutate(Detection_Frequency = n/max(n)) %>% #calculate detection frequency
+  ggplot(aes(y=reorder(ParameterName, Median), x=Month, fill = Detection_Frequency)) + #sorted by detections
+  geom_tile( color = "white", lwd = 0.2, linetype = 1) +
+  scale_fill_viridis_c() +
+  coord_fixed()+
+  labs(x = "Month", y = "Chemical Parameter Detection Frequency")+
+  theme(axis.text.x = element_text(angle=90))
+
+#Omitting Creosote Site Samplers
+
+Air_clean_nosite <- Air_clean2 %>% filter(Month != "01")
+Air_clean_nosite %>%
+  group_by(Month, ParameterName) %>%
+  summarize(Median = median(Result)) %>%
+  ggplot(aes(y=reorder(ParameterName, Median), x=Month, fill = Median)) + #sorted by detections
+  geom_tile( color = "white", lwd = 0.2, linetype = 1) +
+  scale_fill_viridis_c(trans = "log10") +
+  coord_fixed() +
+  labs(x = "Month", y = "Chemical Parameter Median Value ng/m^3")+
+  theme(axis.text.x = element_text(angle=90))
+
+# mean heatmap
+Air_clean_nosite %>%
+  group_by(Month, ParameterName) %>%
+  summarize(Mean = mean(Result), Median = median(Result)) %>%
+  ggplot(aes(y=reorder(ParameterName, Median), x=Month, fill = Mean)) + #sorted by detections
+  geom_tile( color = "white", lwd = 0.2, linetype = 1) +
+  scale_fill_viridis_c(trans = "log10") +
+  coord_fixed()+
+  labs(x = "Month", y = "Chemical Parameter Mean Value ng/m^3")+
+  theme(axis.text.x = element_text(angle=90))
+
+# detection frequency
+Air_clean_nosite %>%
+  group_by(Month, ParameterName) %>%
+  summarize(mean = mean(Result), Median = median(Result), n = n()) %>%
+  mutate(Detection_Frequency = n/max(n)) %>% #calculate detection frequency
+  ggplot(aes(y=reorder(ParameterName, Median), x=Month, fill = Detection_Frequency)) + #sorted by detections
+  geom_tile( color = "white", lwd = 0.2, linetype = 1) +
+  scale_fill_viridis_c() +
+  coord_fixed()+
+  labs(x = "Month", y = "Chemical Parameter Detection Frequency")+
+  theme(axis.text.x = element_text(angle=90))
 ```
