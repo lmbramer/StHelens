@@ -13,7 +13,18 @@ library(ggplot2)
 library(rio)
 library(ggExtra)
 library(ggcorrplot)
+library(psych)
 ```
+
+# log of changes 
+
+# 1/27 to 2/12/2024:
+## changed order of the heatmaps to be consistent (all by det freq) 
+## corrected the list of analytes used in the correlation plot to ensure there are 5 or more pairs of observations per square
+## created a variety of plots using coefficients of variation with at least 10 and 30 detections
+
+# 2/12 - 2/26/2024
+## added coefficient of variation colors to indicate number of detections considered
 
 # Analyte omissions
 
@@ -32,18 +43,6 @@ library(ggcorrplot)
 ## Omit
 ### SH044_WB_08
 ### SH045_WB_08
-
-
-# Aims
-
-## 1.	Ascertain local outdoor features that contribute to personal PAH exposure. 
-##	2.  Explore the influence of demographics and personal habits on total PAH exposure.
-## 3.	Compare changes in outdoor air to changes in personal PAH exposures.
-
-# Hypotheses
-
-## 1.	PAH quantities and profiles captured in personal silicone wristband samplers depend on their housing characteristics, their time-activity patterns, and outdoor PAH contributions.
-## 2.	Changes in outdoor vapor-phase air PAHs proportionally influences PAHs found in personal silicone wristband samples.
 
 
 # Load in all data from the deidentified data book 
@@ -95,17 +94,19 @@ WB_clean %>%
 # median ng/g heatmap
 WB_clean %>%
   group_by(Month, ParameterName) %>%
-  summarize(median = median(Result)) %>%
-  ggplot(aes(y=reorder(ParameterName, median), x=Month, fill = median)) + #sorted by detections
+  summarize(median = median(Result), n = n()) %>%
+  mutate(det_freq = n/max(n)) %>%
+  ggplot(aes(y=reorder(ParameterName, det_freq), x=Month, fill = median)) + #sorted by detections
   geom_tile( color = "white", lwd = 0.2, linetype = 1) +
   scale_fill_viridis_c(trans = "log10") +
-  coord_fixed()
+  coord_fixed() 
 
 # mean ng/g heatmap
 WB_clean %>%
   group_by(Month, ParameterName) %>%
-  summarize(mean = mean(Result)) %>%
-  ggplot(aes(y=reorder(ParameterName, mean), x=Month, fill = mean)) + #sorted by detections
+  summarize(mean = mean(Result), sd = sd(Result), n = n()) %>%
+  mutate(det_freq = n/max(n)) %>%
+  ggplot(aes(y=reorder(ParameterName, det_freq), x=Month, fill = mean)) + #sorted by detections
   geom_tile( color = "white", lwd = 0.2, linetype = 1) +
   scale_fill_viridis_c(trans = "log10") +
   coord_fixed()
@@ -113,16 +114,16 @@ WB_clean %>%
 # detection frequency
 WB_clean %>%
   group_by(Month, ParameterName) %>%
-  summarize(mean = mean(Result), n = n()) %>%
-  mutate(det_freq = n/max(n)) %>% #calculate detection frequency
-  ggplot(aes(y=reorder(ParameterName, mean), x=Month, fill = det_freq)) + #sorted by detections
+  summarize(mean = mean(Result), sd = sd(Result), n = n()) %>%
+  mutate(det_freq = n/max(n)) %>%
+  ggplot(aes(y=reorder(ParameterName, det_freq), x=Month, fill = det_freq)) + #sorted by detections
   geom_tile( color = "white", lwd = 0.2, linetype = 1) +
   scale_fill_viridis_c() +
   coord_fixed()
 
 ```
 
-# Data Visualization - stacked bar chart
+# Stacked bar chart - median concentrations (>50% rate of detection within each month)
 
 ```{r}
 #stacked bar chart; limit to 50% detection rate
@@ -156,10 +157,9 @@ WB_clean %>% #this is median concentrations (ng/g) not sum!!
   geom_bar(position = "stack", stat = "identity") +
   scale_fill_discrete(type  = pal) +
   theme_bw() 
-
 ```
 
-# Data Visualization - Correlation of chemicals
+# Correlation of chemicals
 
 ```{r}
 # First convert data to a matrix with "NA" values for BLOD instances where each row is an analyte (5+ detections) and each row is a different WB sample (at least one detection).
@@ -169,7 +169,6 @@ WB_clean %>% #this is median concentrations (ng/g) not sum!!
   filter(n>4)) 
 
 chemical_list <- as.vector(five_dets$ParameterName) # save the list of analytes with 5 or more detections (45 analytes)
-
 WB_clean_five_dets <- subset(WB_clean, ParameterName %in% chemical_list) # create a new WB dataset with only the list of analytes saved above
 
 WB_clean_wide <- WB_clean_five_dets %>%
@@ -177,22 +176,52 @@ WB_clean_wide <- WB_clean_five_dets %>%
   pivot_wider(names_from = ParameterName, values_from = Result)
 
 WB_clean_wide <- as.data.frame(WB_clean_wide)
+
 row.names(WB_clean_wide) <- paste(WB_clean_wide$ID, WB_clean_wide$Month, sep="_")
+
 WB_mat_ready <- WB_clean_wide %>%
   select(-ID, -Month)
 
 (WB_mat <- as.matrix(WB_mat_ready))
 
+# Identify "problem" chemicals that have less than 5 pairs of data for a comparison
+
+problems <- pairwiseReport(WB_mat, diagonal = F, cut = 5)
+print(problems, short=F)
+
+problem_list_rows <- c("2-methylanthracene", "6-methylchrysene", "anthracene", "benzo[a]fluorene", "benzo[a]pyrene", "benzo[b]fluorene", "benzo[ghi]perylene", "benzo[j]fluoranthene", "benzo[k]fluoranthene", "coronene", "cyclopenta[cd]pyrene", "indeno[1,2,3-cd]pyrene", "perylene")
+
+#removing chemicals with fewer than 5 pairs of observations from the matrix
+(five_pairs <- WB_clean_five_dets %>%
+    filter(!ParameterName %in% problem_list_rows)) 
+
+# log10 transform data and shape into a matrix for correlation plot
+(logWB_clean_wide <- five_pairs %>%
+  mutate(log10Result = log10(Result)) %>% 
+  select(-Flag, -Result) %>%
+  pivot_wider(names_from = ParameterName, values_from = log10Result))
+
+logWB_clean_wide <- as.data.frame(logWB_clean_wide)
+row.names(logWB_clean_wide) <- paste(logWB_clean_wide$ID, logWB_clean_wide$Month, sep="_")
+(logWB_mat_ready <- logWB_clean_wide %>%
+  select(-ID, -Month))
+
+(logWB_mat <- as.matrix(logWB_mat_ready))
+
 # Create a correlation matrix and plot
 
-WB_chem_corr <- cor(WB_mat, use="pairwise.complete.obs")
-ggcorrplot(WB_chem_corr, type = "lower") #simple
-ggcorrplot(WB_chem_corr, hc.order = TRUE, type = "lower") # uses clustering to re-order chemicals
+logWB_chem_corr <- cor(logWB_mat, use="pairwise.complete.obs")
+logWB_pmat <- cor_pmat(logWB_mat,
+  method = "pearson",
+  alternative = "two.sided",
+  conf.level = 0.95)
+
+ggcorrplot(logWB_chem_corr, type = "lower") #simple
+ggcorrplot(logWB_chem_corr, hc.order = TRUE, p.mat = logWB_pmat) # uses clustering to re-order chemicals; can set "lab = T" to see numbers; x's show non sig correlation
 
 ```
 
-
-# Quick Look into outliers (looks like mostly in group 1)
+# Quick Look into high concentrations (looks like mostly in group 1)
 
 ```{r}
 # 1. filter data by any concentrations above 500 and 1000 ng/g
@@ -230,3 +259,266 @@ part %>%
   filter(ID == "SH018") # No obvious explanation. Does not smoke, old house (1930's), reported odor, has AC, no air freshener, gas stove, retired. Look at location.
 
 ```
+
+# Coefficient of Variation for 30 or more detections
+
+```{r}
+(thirty_dets <- WB_clean %>%
+  count(ParameterName) %>%
+  filter(n>29)) 
+
+chemical_list30 <- as.vector(thirty_dets$ParameterName) # save the list of analytes with 30 or more detections 
+WB_clean_thirty_dets <- subset(WB_clean, ParameterName %in% chemical_list30)
+
+
+WB_clean_thirty_dets %>% #by month; group 1 much more variable
+  group_by(ParameterName, Month) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
+  filter(!is.na(CV)) %>%
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
+  geom_point() +
+  geom_vline(xintercept = 100) +
+  facet_grid(~ Month) + 
+  labs(x = "Coefficient of Variation (%)", y = NULL) +
+  theme_bw()
+
+WB_clean_thirty_dets %>% #group 1
+  filter(Month == 2|
+           Month == 4| 
+           Month == 6|
+           Month == 8) %>%
+  group_by(ParameterName, Month) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
+  filter(!is.na(CV)) %>%
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
+  geom_point() +
+    geom_vline(xintercept = 100) +
+  facet_grid(~Month,) + 
+  labs(x = "Coefficient of Variation (%)", y = NULL) +
+  theme_bw() 
+
+WB_clean_thirty_dets %>% #group 2
+  filter(Month == 3|
+           Month == 5| 
+           Month == 7|
+           Month == 9) %>%
+  group_by(ParameterName, Month) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
+  filter(!is.na(CV)) %>%
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
+  geom_point() +
+    geom_vline(xintercept = 100) +
+  facet_grid(~Month,) + 
+  labs(x = "Coefficient of Variation (%)", y = NULL) +
+  theme_bw()
+
+WB_clean_thirty_dets %>% #by ID
+  group_by(ParameterName, ID) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100) %>%
+  filter(!is.na(CV)) %>%
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = ID)) +
+  geom_point() + 
+    geom_vline(xintercept = 100) +
+  labs(x = "Coefficient of Variation (%)", y = NULL) +
+  theme_bw()
+
+WB_clean_thirty_dets %>% #boxplot by ID - individual CVs
+  group_by(ParameterName, ID) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100) %>%
+  filter(!is.na(CV)) %>%
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV))) +
+  geom_boxplot() + 
+    geom_vline(xintercept = 100) +
+  labs(x = "Coefficient of Variation (%)", y = NULL) +
+  theme_bw()
+
+WB_clean_thirty_dets %>% #all samples combined
+  group_by(ParameterName) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
+  filter(!is.na(CV)) %>%
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
+  geom_point() + 
+    geom_vline(xintercept = 100) +
+  labs(x = "Coefficient of Variation (%)", y = NULL) +
+  theme_bw()
+```
+
+# Coefficient of Variation for 30 or more detections - no SH018
+
+```{r}
+(thirty_dets <- WB_clean %>%
+   filter(ID != "SH018") %>%
+  count(ParameterName) %>%
+  filter(n>29)) 
+
+chemical_list30 <- as.vector(thirty_dets$ParameterName) # save the list of analytes with 30 or more detections 
+WB_clean_thirty_dets <- subset(WB_clean, ParameterName %in% chemical_list30)
+
+WB_clean_thirty_dets %>% #by month; group 1 much more variable
+  filter(ID != "SH018") %>%
+  group_by(ParameterName, Month) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
+  filter(!is.na(CV)) %>%
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
+  geom_point() +
+  geom_vline(xintercept = 100) +
+  facet_grid(~ Month) + 
+  labs(x = "Coefficient of Variation (%)", y = NULL) +
+  theme_bw()
+
+WB_clean_thirty_dets %>% #group 1
+  filter(ID != "SH018") %>%
+  filter(Month == 2|
+           Month == 4| 
+           Month == 6|
+           Month == 8) %>%
+  group_by(ParameterName, Month) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n=n()) %>%
+  filter(!is.na(CV)) %>%
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
+  geom_point() +
+    geom_vline(xintercept = 100) +
+  facet_grid(~Month,) + 
+  labs(x = "Coefficient of Variation (%)", y = NULL) +
+  theme_bw() 
+
+WB_clean_thirty_dets %>% #boxplot by ID - individual CVs
+  filter(ID != "SH018") %>%
+  group_by(ParameterName, ID) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100) %>%
+  filter(!is.na(CV)) %>%
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV))) +
+  geom_boxplot() + 
+    geom_vline(xintercept = 100) +
+  labs(x = "Coefficient of Variation (%)", y = NULL) +
+  theme_bw()
+
+WB_clean_thirty_dets %>% #combined
+  filter(ID != "SH018") %>%
+  group_by(ParameterName) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
+  filter(!is.na(CV)) %>%
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
+  geom_point() + 
+    geom_vline(xintercept = 100) +
+  labs(x = "Coefficient of Variation (%)", y = NULL) +
+  theme_bw()
+
+
+#integrate chemical parameters in the dataset to sort chemicals in the y-axis
+(CV_Name <- WB_clean_thirty_dets %>% #create names to match the chem_info data
+  filter(ID != "SH018") %>%
+  group_by(ParameterName) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
+  filter(!is.na(CV)) %>%
+  rename("Name" = ParameterName))
+
+(cheminfo_30WBdets <- subset(chem_info, Name %in% chemical_list30))
+(CV_cheminfo <- left_join(CV_Name, cheminfo_30WBdets, by ="Name")) 
+
+#relationship between MW and CV
+ggplot(CV_cheminfo, aes(x = CV, y = reorder(Name, MW), color = n)) +
+  geom_point() + 
+    geom_vline(xintercept = 100) +
+  labs(x = "Coefficient of Variation (%)", y = NULL) +
+  theme_bw()
+
+#show rings and CV (organized by M.W.)
+ggplot(CV_cheminfo, aes(x = CV, y = reorder(Name, MW), color = n)) +
+  geom_point(aes(size = Rings)) + 
+    geom_vline(xintercept = 100) +
+  labs(x = "Coefficient of Variation (%)", y = NULL) +
+  theme_bw()
+
+#relationship between koa (octanol, air partitioning coefficient) and CV
+ggplot(CV_cheminfo, aes(x = CV, y = reorder(Name, `log Koa`), color = n)) +
+  geom_point() + 
+    geom_vline(xintercept = 100) +
+  labs(x = "Coefficient of Variation (%)", y = NULL) +
+  theme_bw()
+```
+
+# Coefficient of Variation for 10 or more detections
+
+```{r}
+(ten_dets <- WB_clean %>%
+  count(ParameterName) %>%
+  filter(n>9)) 
+
+chemical_list10 <- as.vector(ten_dets$ParameterName) # save the list of analytes with 10 or more detections (37 analytes)
+WB_clean_ten_dets <- subset(WB_clean, ParameterName %in% chemical_list10)
+
+
+WB_clean_ten_dets %>% #by month; group 1 much more variable
+  group_by(ParameterName, Month) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
+  filter(!is.na(CV)) %>%
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
+  geom_point() +
+  geom_vline(xintercept = 100) +
+  facet_grid(~ Month) + 
+  labs(x = "Coefficient of Variation (%)", y = NULL) +
+  theme_bw()
+
+WB_clean_ten_dets %>% #group 1
+  filter(Month == 2|
+           Month == 4| 
+           Month == 6|
+           Month == 8) %>%
+  group_by(ParameterName, Month) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
+  filter(!is.na(CV)) %>%
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
+  geom_point() +
+    geom_vline(xintercept = 100) +
+  facet_grid(~Month,) + 
+  labs(x = "Coefficient of Variation (%)", y = NULL) +
+  theme_bw() 
+
+WB_clean_ten_dets %>% #group 2
+  filter(Month == 3|
+           Month == 5| 
+           Month == 7|
+           Month == 9) %>%
+  group_by(ParameterName, Month) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
+  filter(!is.na(CV)) %>%
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
+  geom_point() +
+    geom_vline(xintercept = 100) +
+  facet_grid(~Month,) + 
+  labs(x = "Coefficient of Variation (%)", y = NULL) +
+  theme_bw()
+
+WB_clean_ten_dets %>% #by ID
+  group_by(ParameterName, ID) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100) %>%
+  filter(!is.na(CV)) %>%
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = ID)) +
+  geom_point() + 
+    geom_vline(xintercept = 100) +
+  labs(x = "Coefficient of Variation (%)", y = NULL) +
+  theme_bw()
+
+WB_clean_ten_dets %>% #boxplot by ID - individual CVs
+  group_by(ParameterName, ID) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100) %>%
+  filter(!is.na(CV)) %>%
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV))) +
+  geom_boxplot() + 
+    geom_vline(xintercept = 100) +
+  labs(x = "Coefficient of Variation (%)", y = NULL) +
+  theme_bw()
+
+WB_clean_ten_dets %>% #combined
+  group_by(ParameterName) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
+  filter(!is.na(CV)) %>%
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
+  geom_point() + 
+    geom_vline(xintercept = 100) +
+  labs(x = "Coefficient of Variation (%)", y = NULL) +
+  theme_bw()
+
+```
+
