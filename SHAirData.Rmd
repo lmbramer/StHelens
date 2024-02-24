@@ -178,4 +178,382 @@ Air_clean_nosite %>%
   coord_fixed()+
   labs(x = "Month", y = "Chemical Parameter Detection Frequency")+
   theme(axis.text.x = element_text(angle=90))
+
+
+#Sum PAHs and Individuals month by month 
+#better to plot detection frequencies over time 
+Air_clean_count <- Air_clean1 %>% count(Month) 
+ggplot(data=Air_clean_count, aes(x=Month, y=n, group=1))+
+  geom_path()+
+  geom_point() +
+  labs(x= "Sampling Month", y = "Number of Total PAH detections", title = "Sum PAH Detections in Air Samplers by Sampling Month") +
+  theme(panel.background = element_rect(fill='white'))+
+  theme(panel.grid=element_line(color='gray'))
+
+
+WBD_clean_Month <-WBD_clean %>% count(Month) 
+ggplot(data= WBD_clean_Month, aes(x=Month, y=n, group=1))+
+  geom_path()+
+  geom_point() +
+  labs(x= "Sampling Month", y = "Number of Total PAH detections", title = "Sum PAH Detections in Wristband Samplers by Sampling Month") +
+  theme(panel.background = element_rect(fill='white'))+
+  theme(panel.grid=element_line(color='gray'))
+
+#Low MW is 3 rings or lower. High MW is 4 rings or more
+Air_clean_low <- Air_clean1 %>% filter(ParameterName == "naphthalene"|
+                      ParameterName == "1-methylnaphthalene"|
+                      ParameterName == "2-methylnaphthalene"|
+                      ParameterName == "2-methylphenanthrene"|
+                      ParameterName == "2-methylanthracene"|
+                      ParameterName == "3,6-dimethylphenanthrene"|
+                      ParameterName == "acenaphthylene"|
+                      ParameterName == "fluorene"|
+                      ParameterName == "anthracene"|
+                      ParameterName == "9-methylanthracene"|
+                      ParameterName == "acenaphthene"|
+                      ParameterName == "phenanthrene"|
+                      ParameterName == "dibenzothiophene"|
+                      ParameterName == "1,6 and 1,3-dimethylnaphthalene"|
+                      ParameterName == "1,2-dimethylnaphthalene"|
+                      ParameterName == "1,4-dimethylnaphthalene"|
+                      ParameterName == "2-ethylnaphthalene"|
+                      ParameterName == "1,5-dimethylnaphthalene"|
+                      ParameterName =="2,6-dimethylnaphthalene"|
+                      ParameterName == "1,8-dimethylnaphthalene"|
+                      ParameterName == "2,6-diethylnaphthalene"|
+                      ParameterName == "1-methylphenanthrene"|
+                      ParameterName == "9-methylanthracene"|
+                      ParameterName == "2,3-Dimethylanthracene"|
+                      ParameterName == "dibenzo[a,h]anthracene")
+
+Air_clean_high <- Air_clean1 %>% filter(ParameterName == "chrysene"|
+                      ParameterName == "benzo[c]fluorene"|
+                      ParameterName == "benzo[b]fluoranthene"|
+                      ParameterName == "benzo[e]pyrene"|
+                      ParameterName == "benzo[a]pyrene"|
+                      ParameterName == "benzo[a]chrysene"|
+                      ParameterName == "fluoranthene"|
+                      ParameterName == "dibenzo[a,e]pyrene"|
+                      ParameterName == "dibenzo[a,l]pyrene"|
+                      ParameterName == "pyrene"|
+                      ParameterName == "triphenylene"|
+                      ParameterName == "1-methylpyrene"|
+                      ParameterName == "9,10-dimethylanthracene"|
+                      ParameterName == "benzo[a]fluorene"|
+                      ParameterName == "benzo[b]fluorene"|
+                      ParameterName == "benz[a]anthracene"|
+                      ParameterName == "cyclopenta[c,d]pyrene "|
+                      ParameterName == "chrysene"|
+                      ParameterName == "naphtho[2,3-j] and naphtho[1,2-k]fluoranthene"|
+                      ParameterName == "naphtho[1,2-b]fluoranthene"|
+                      ParameterName == "anthanthrene"|
+                      ParameterName == "6-methylchrysene"|
+                      ParameterName == "indeno[1,2,3-cd]pyrene"|
+                      ParameterName == "dibenzo[a,e]fluoranthene"|
+                      ParameterName == "dibenzo[e,l]pyrene"|
+                      ParameterName == "naphtho[2,3-b]fluoranthene"|
+                      ParameterName == "perylene"|
+                      ParameterName == "5-methylchrysene"|
+                      ParameterName == "retene"|
+                      ParameterName == "benzo[k]fluoranthene"|
+                      ParameterName == "benzo[j]fluoranthene"|
+                      ParameterName == "benz[j]aceanthrylene &
+benz[e]aceanthrylene"|
+ParameterName == "coronene"|
+ParameterName == "benzo[ghi]perylene")
+                      
+Air_clean_low_Month <-Air_clean_low %>% count(Month) 
+ggplot(data= Air_clean_low_Month, aes(x=Month, y=n, group=1))+
+  geom_path()+
+  geom_point() +
+  labs(x= "Sampling Month", y = "Number of Total PAH detections", title = "Sum PAH Detections in low MW in Air Samplers by Sampling Month") +
+  theme(panel.background = element_rect(fill='white'))+
+  theme(panel.grid=element_line(color='gray'))
+
+Air_clean_high_Month <-Air_clean_high %>% count(Month) 
+ggplot(data= Air_clean_high_Month, aes(x=Month, y=n, group=1))+
+  geom_path()+
+  geom_point() +
+  labs(x= "Sampling Month", y = "Number of Total PAH detections", title = "Sum PAH Detections in High MW in Air Samplers by Sampling Month") +
+  theme(panel.background = element_rect(fill='white'))+
+  theme(panel.grid=element_line(color='gray'))
+
+WBD_clean_low <- WBD_clean %>% filter(ParameterName == "naphthalene"|
+                      ParameterName == "1-methylnaphthalene"|
+                      ParameterName == "2-methylnaphthalene"|
+                      ParameterName == "2-methylphenanthrene"|
+                      ParameterName == "2-methylanthracene"|
+                      ParameterName == "3,6-dimethylphenanthrene"|
+                      ParameterName == "acenaphthylene"|
+                      ParameterName == "fluorene"|
+                      ParameterName == "anthracene"|
+                      ParameterName == "9-methylanthracene"|
+                      ParameterName == "acenaphthene"|
+                      ParameterName == "phenanthrene"|
+                      ParameterName == "dibenzothiophene"|
+                      ParameterName == "1,6 and 1,3-dimethylnaphthalene"|
+                      ParameterName == "1,2-dimethylnaphthalene"|
+                      ParameterName == "1,4-dimethylnaphthalene"|
+                      ParameterName == "2-ethylnaphthalene"|
+                      ParameterName == "1,5-dimethylnaphthalene"|
+                      ParameterName =="2,6-dimethylnaphthalene"|
+                      ParameterName == "1,8-dimethylnaphthalene"|
+                      ParameterName == "2,6-diethylnaphthalene"|
+                      ParameterName == "1-methylphenanthrene"|
+                      ParameterName == "9-methylanthracene"|
+                      ParameterName == "2,3-Dimethylanthracene"|
+                      ParameterName == "dibenzo[a,h]anthracene")
+
+WBD_clean_high <- WBD_clean %>% filter(ParameterName == "chrysene"|
+                      ParameterName == "benzo[c]fluorene"|
+                      ParameterName == "benzo[b]fluoranthene"|
+                      ParameterName == "benzo[e]pyrene"|
+                      ParameterName == "benzo[a]pyrene"|
+                      ParameterName == "benzo[a]chrysene"|
+                      ParameterName == "fluoranthene"|
+                      ParameterName == "dibenzo[a,e]pyrene"|
+                      ParameterName == "dibenzo[a,l]pyrene"|
+                      ParameterName == "pyrene"|
+                      ParameterName == "triphenylene"|
+                      ParameterName == "1-methylpyrene"|
+                      ParameterName == "9,10-dimethylanthracene"|
+                      ParameterName == "benzo[a]fluorene"|
+                      ParameterName == "benzo[b]fluorene"|
+                      ParameterName == "benz[a]anthracene"|
+                      ParameterName == "cyclopenta[c,d]pyrene "|
+                      ParameterName == "chrysene"|
+                      ParameterName == "naphtho[2,3-j] and naphtho[1,2-k]fluoranthene"|
+                      ParameterName == "naphtho[1,2-b]fluoranthene"|
+                      ParameterName == "anthanthrene"|
+                      ParameterName == "6-methylchrysene"|
+                      ParameterName == "indeno[1,2,3-cd]pyrene"|
+                      ParameterName == "dibenzo[a,e]fluoranthene"|
+                      ParameterName == "dibenzo[e,l]pyrene"|
+                      ParameterName == "naphtho[2,3-b]fluoranthene"|
+                      ParameterName == "perylene"|
+                      ParameterName == "5-methylchrysene"|
+                      ParameterName == "retene"|
+                      ParameterName == "benzo[k]fluoranthene"|
+                      ParameterName == "benzo[j]fluoranthene"|
+                      ParameterName == "benz[j]aceanthrylene &
+benz[e]aceanthrylene"|
+ParameterName == "coronene"|
+ParameterName == "benzo[ghi]perylene")
+
+WBD_clean_low_Month <-WBD_clean_low %>% count(Month) 
+ggplot(data= WBD_clean_low_Month, aes(x=Month, y=n, group=1))+
+  geom_path()+
+  geom_point() +
+  labs(x= "Sampling Month", y = "Number of Total PAH detections", title = "Sum PAH Detections in low MW in Wristband Samplers by Sampling Month") +
+  theme(panel.background = element_rect(fill='white'))+
+  theme(panel.grid=element_line(color='gray'))
+
+WBD_clean_high_Month <-WBD_clean_high %>% count(Month) 
+ggplot(data= WBD_clean_high_Month, aes(x=Month, y=n, group=1))+
+  geom_path()+
+  geom_point() +
+  labs(x= "Sampling Month", y = "Number of Total PAH detections", title = "Sum PAH Detections in High MW in Wristband Samplers by Sampling Month") +
+  theme(panel.background = element_rect(fill='white'))+
+  theme(panel.grid=element_line(color='gray'))
+
+#WBD without problem child SH018 
+
+WBD_clean_noSH018 <- WBD_clean %>% filter(ID != "SH018")
+WBD_clean_noSH018_Month <-WBD_clean_noSH018 %>% count(Month)
+
+WBD_clean_low_noSH018 <- WBD_clean_noSH018 %>% filter(ParameterName == "naphthalene"|
+                      ParameterName == "1-methylnaphthalene"|
+                      ParameterName == "2-methylnaphthalene"|
+                      ParameterName == "2-methylphenanthrene"|
+                      ParameterName == "2-methylanthracene"|
+                      ParameterName == "3,6-dimethylphenanthrene"|
+                      ParameterName == "acenaphthylene"|
+                      ParameterName == "fluorene"|
+                      ParameterName == "anthracene"|
+                      ParameterName == "9-methylanthracene"|
+                      ParameterName == "acenaphthene"|
+                      ParameterName == "phenanthrene"|
+                      ParameterName == "dibenzothiophene"|
+                      ParameterName == "1,6 and 1,3-dimethylnaphthalene"|
+                      ParameterName == "1,2-dimethylnaphthalene"|
+                      ParameterName == "1,4-dimethylnaphthalene"|
+                      ParameterName == "2-ethylnaphthalene"|
+                      ParameterName == "1,5-dimethylnaphthalene"|
+                      ParameterName =="2,6-dimethylnaphthalene"|
+                      ParameterName == "1,8-dimethylnaphthalene"|
+                      ParameterName == "2,6-diethylnaphthalene"|
+                      ParameterName == "1-methylphenanthrene"|
+                      ParameterName == "9-methylanthracene"|
+                      ParameterName == "2,3-Dimethylanthracene"|
+                      ParameterName == "dibenzo[a,h]anthracene")
+
+WBD_clean_high_noSH018 <- WBD_clean_noSH018 %>% filter(ParameterName == "chrysene"|
+                      ParameterName == "benzo[c]fluorene"|
+                      ParameterName == "benzo[b]fluoranthene"|
+                      ParameterName == "benzo[e]pyrene"|
+                      ParameterName == "benzo[a]pyrene"|
+                      ParameterName == "benzo[a]chrysene"|
+                      ParameterName == "fluoranthene"|
+                      ParameterName == "dibenzo[a,e]pyrene"|
+                      ParameterName == "dibenzo[a,l]pyrene"|
+                      ParameterName == "pyrene"|
+                      ParameterName == "triphenylene"|
+                      ParameterName == "1-methylpyrene"|
+                      ParameterName == "9,10-dimethylanthracene"|
+                      ParameterName == "benzo[a]fluorene"|
+                      ParameterName == "benzo[b]fluorene"|
+                      ParameterName == "benz[a]anthracene"|
+                      ParameterName == "cyclopenta[c,d]pyrene "|
+                      ParameterName == "chrysene"|
+                      ParameterName == "naphtho[2,3-j] and naphtho[1,2-k]fluoranthene"|
+                      ParameterName == "naphtho[1,2-b]fluoranthene"|
+                      ParameterName == "anthanthrene"|
+                      ParameterName == "6-methylchrysene"|
+                      ParameterName == "indeno[1,2,3-cd]pyrene"|
+                      ParameterName == "dibenzo[a,e]fluoranthene"|
+                      ParameterName == "dibenzo[e,l]pyrene"|
+                      ParameterName == "naphtho[2,3-b]fluoranthene"|
+                      ParameterName == "perylene"|
+                      ParameterName == "5-methylchrysene"|
+                      ParameterName == "retene"|
+                      ParameterName == "benzo[k]fluoranthene"|
+                      ParameterName == "benzo[j]fluoranthene"|
+                      ParameterName == "benz[j]aceanthrylene &
+benz[e]aceanthrylene"|
+ParameterName == "coronene"|
+ParameterName == "benzo[ghi]perylene")
+
+ggplot(data= WBD_clean_noSH018_Month, aes(x=Month, y=n, group=1))+
+  geom_path()+
+  geom_point() +
+  labs(x= "Sampling Month", y = "Number of Total PAH detections", title = "PAH Detections in Wristband Samplers by Sampling Month no SH018") +
+  theme(panel.background = element_rect(fill='white'))+
+  theme(panel.grid=element_line(color='gray')) 
+
+WBD_clean_low_noSH018_Month <-WBD_clean_low_noSH018 %>% count(Month)
+
+WBD_clean_high_noSH018_Month <-WBD_clean_high_noSH018 %>% count(Month)
+
+ggplot(data= WBD_clean_low_noSH018_Month, aes(x=Month, y=n, group=1))+
+  geom_path()+
+  geom_point() +
+  labs(x= "Sampling Month", y = "Number of Total PAH detections", title = "Total Low MW PAH Detections in Wristband Samplers by Sampling Month no SH018") +
+  theme(panel.background = element_rect(fill='white'))+
+  theme(panel.grid=element_line(color='gray')) 
+
+ggplot(data= WBD_clean_high_noSH018_Month, aes(x=Month, y=n, group=1))+
+  geom_path()+
+  geom_point() +
+  labs(x= "Sampling Month", y = "Number of Total PAH detections", title = "Total High MW PAH Detections in Wristband Samplers by Sampling Month no SH018") +
+  theme(panel.background = element_rect(fill='white'))+
+  theme(panel.grid=element_line(color='gray'))
+
+#Average instead of Total Detections excluding SH018 with error bars
+
+standard_error <- function(x) sd(x) / sqrt(length(x))
+
+Air_clean_avfreq <- Air_clean1 %>% group_by(Month,ID)%>% summarise(Det = n())%>% group_by(Month) %>% mutate(AvFreq = mean(Det)) %>% mutate(se = standard_error(Det)) %>% mutate(pos_se = AvFreq+se) %>% mutate(neg_se = AvFreq -se)
+
+Air_clean_avfreq %>% ggplot(aes(x=Month, y=AvFreq, group=1))+
+   geom_path()+
+  geom_point() +
+  ylim(0,40)+
+  geom_errorbar(aes(ymin =Air_clean_avfreq$neg_se , ymax =Air_clean_avfreq$pos_se),  width=.2,
+                 position=position_dodge(0.05)) +
+  labs(x= "Sampling Month", y = "Average PAH Detections per Sample ID", title = "Average PAH Detections in Air Samplers by Sampling Month") +
+  theme(panel.background = element_rect(fill='white'))+
+  theme(panel.grid=element_line(color='gray'))
+
+
+
+Air_clean_low_avfreq <- Air_clean_low %>% group_by(Month,ID)%>% summarise(Det = n())%>% group_by(Month) %>% mutate(AvFreq = mean(Det)) %>% mutate(se = standard_error(Det)) %>% mutate(pos_se = AvFreq+se) %>% mutate(neg_se = AvFreq -se)
+
+Air_clean_low_avfreq %>% ggplot(aes(x=Month, y=AvFreq, group=1))+
+   geom_path()+
+  geom_point() +
+  ylim(0,40)+ 
+  geom_errorbar(aes(ymin =Air_clean_low_avfreq$neg_se , ymax =Air_clean_low_avfreq$pos_se),  width=.2,
+                 position=position_dodge(0.05)) +
+  labs(x= "Sampling Month", y = "Average PAH Detections per Sample ID", title = "Average low MW PAH Detections in Air Samplers by Sampling Month") +
+  theme(panel.background = element_rect(fill='white'))+
+  theme(panel.grid=element_line(color='gray'))
+ 
+
+
+Air_clean_high_avfreq <- Air_clean_high %>% group_by(Month,ID)%>% summarise(Det = n())%>% group_by(Month) %>% mutate(AvFreq = mean(Det)) %>% mutate(se = standard_error(Det)) %>% mutate(pos_se = AvFreq+se) %>% mutate(neg_se = AvFreq -se)
+
+Air_clean_high_avfreq %>% ggplot(aes(x=Month, y=AvFreq, group=1))+
+   geom_path()+
+  geom_point() +
+  ylim(0,40)+ 
+  geom_errorbar(aes(ymin =Air_clean_high_avfreq$neg_se , ymax =Air_clean_high_avfreq$pos_se),  width=.2,
+                 position=position_dodge(0.05)) +
+  labs(x= "Sampling Month", y = "Average PAH Detections per Sample ID", title = "Average high MW PAH Detections in Air Samplers by Sampling Month") +
+  theme(panel.background = element_rect(fill='white'))+
+  theme(panel.grid=element_line(color='gray'))
+
+#I'd like to get these on one plot, so we can see proportionally high and low affecting the whole
+
+WBD_clean_avfreq <- WBD_clean %>% group_by(Month,ID)%>% summarise(Det = n())%>% group_by(Month) %>% mutate(AvFreq = mean(Det)) %>% mutate(se = standard_error(Det)) %>% mutate(pos_se = AvFreq+se) %>% mutate(neg_se = AvFreq -se)
+
+WBD_clean_avfreq %>% ggplot(aes(x=Month, y=AvFreq, group=1))+
+   geom_path()+
+  geom_point() +
+  ylim(0,40)+
+  geom_errorbar(aes(ymin =WBD_clean_avfreq$neg_se , ymax =WBD_clean_avfreq$pos_se),  width=.2,
+                 position=position_dodge(0.05)) +
+  labs(x= "Sampling Month", y = "Average PAH Detections per Sample ID", title = "Average PAH Detections in WB Samplers by Sampling Month") +
+  theme(panel.background = element_rect(fill='white'))+
+  theme(panel.grid=element_line(color='gray'))
+
+
+WBD_clean_low_avfreq <- WBD_clean_low %>% group_by(Month,ID)%>% summarise(Det = n())%>% group_by(Month) %>% mutate(AvFreq = mean(Det)) %>% mutate(se = standard_error(Det)) %>% mutate(pos_se = AvFreq+se) %>% mutate(neg_se = AvFreq -se)
+
+WBD_clean_low_avfreq %>% ggplot(aes(x=Month, y=AvFreq, group=1))+
+   geom_path()+
+  geom_point() +
+  ylim(0,40)+
+  geom_errorbar(aes(ymin =WBD_clean_low_avfreq$neg_se , ymax =WBD_clean_low_avfreq$pos_se),  width=.2,
+                 position=position_dodge(0.05)) +
+  labs(x= "Sampling Month", y = "Average PAH Detections per Sample ID", title = "Average low MW PAH Detections in WB Samplers by Sampling Month") +
+  theme(panel.background = element_rect(fill='white'))+
+  theme(panel.grid=element_line(color='gray'))
+
+
+
+WBD_clean_high_avfreq <- WBD_clean_high %>% group_by(Month,ID)%>% summarise(Det = n())%>% group_by(Month) %>% mutate(AvFreq = mean(Det)) %>% mutate(se = standard_error(Det)) %>% mutate(pos_se = AvFreq+se) %>% mutate(neg_se = AvFreq -se)
+
+WBD_clean_high_avfreq %>% ggplot(aes(x=Month, y=AvFreq, group=1))+
+   geom_path()+
+  geom_point() +
+  ylim(0,40)+
+  geom_errorbar(aes(ymin =WBD_clean_high_avfreq$neg_se , ymax =WBD_clean_high_avfreq$pos_se),  width=.2,
+                 position=position_dodge(0.05)) +
+  labs(x= "Sampling Month", y = "Average PAH Detections per Sample ID", title = "Average High MW PAH Detections in WB Samplers by Sampling Month") +
+  theme(panel.background = element_rect(fill='white'))+
+  theme(panel.grid=element_line(color='gray'))
+
+ggplot()+
+  geom_line(data = Air_clean_avfreq, aes(x=Month, y=AvFreq, group = 1), color='black')+
+  geom_line(data =Air_clean_low_avfreq, aes(x=Month, y=AvFreq, group =1), color='red') +
+  geom_line(data=Air_clean_high_avfreq, aes(x=Month, y=AvFreq,group=1), color='blue')+
+  geom_point(data = Air_clean_avfreq, aes(x=Month, y=AvFreq, group=1), color='black')+
+  geom_point(data = Air_clean_low_avfreq, aes(x=Month, y=AvFreq,group=1), color='red')+
+  geom_point(data = Air_clean_high_avfreq, aes(x=Month, y=AvFreq, group=1), color='blue')+
+  labs(x= "Sampling Month", y = "Average PAH Detections per Sample ID", title = "Average PAH Detections in Air Samplers by Sampling Month") +
+  theme(panel.background = element_rect(fill='white'))+
+  theme(panel.grid=element_line(color='gray'))
+
+#need a legend for this guy, scale manual not working?
+ggplot()+
+  geom_line(data = WBD_clean_avfreq, aes(x=Month, y=AvFreq, group = 1), color='black')+
+  geom_line(data =WBD_clean_low_avfreq, aes(x=Month, y=AvFreq, group =1), color='red') +
+  geom_line(data=WBD_clean_high_avfreq, aes(x=Month, y=AvFreq,group=1), color='blue')+
+  geom_point(data = WBD_clean_avfreq, aes(x=Month, y=AvFreq, group=1), color='black')+
+  geom_point(data = WBD_clean_low_avfreq, aes(x=Month, y=AvFreq,group=1), color='red')+
+  geom_point(data = WBD_clean_high_avfreq, aes(x=Month, y=AvFreq, group=1), color='blue')+
+  labs(x= "Sampling Month", y = "Average PAH Detections per Sample ID", title = "Average PAH Detections in WB Samplers by Sampling Month") +
+  theme(panel.background = element_rect(fill='white'))+
+  theme(panel.grid=element_line(color='gray'))
+
 ```
