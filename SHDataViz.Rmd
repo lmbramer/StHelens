@@ -13,13 +13,28 @@ library(ggplot2)
 library(rio)
 library(ggExtra)
 library(ggcorrplot)
+library(corrplot)
 library(psych)
+library(ggbreak)
+library(patchwork)
+library(EnvStats)
+library(magrittr)
+library(Tplyr)
+library(knitr)
 ```
 
-# log of changes since last share (1/27) to 2/12/2023:
+# Log of changes 
+
+# 1/27 to 2/12/2024:
 ## changed order of the heatmaps to be consistent (all by det freq) 
 ## corrected the list of analytes used in the correlation plot to ensure there are 5 or more pairs of observations per square
 ## created a variety of plots using coefficients of variation with at least 10 and 30 detections
+
+# 2/12 - 2/26/2024
+## added coefficient of variation colors to indicate number of detections considered
+
+# 2/26 - 3/26/2024
+## updated figures included in dissertation
 
 
 # Analyte omissions
@@ -28,7 +43,6 @@ library(psych)
 ## benz[j] and [e]aceanthrylene
 ## 2,6-dimethylnaphthalene
 ## 2,6-diethylnaphthalene
-
 
 # Problematic samples
 
@@ -74,7 +88,6 @@ EnvD <- Data_list$environmental_data
   mutate(Flag = replace_na(Flag, "D")) %>% #D represents detections; easier to work with than NA values
   filter(Flag != "U"))
 ```
-
 
 # Data Visualization - data distributions and heatmaps
 
@@ -153,7 +166,29 @@ WB_clean %>% #this is median concentrations (ng/g) not sum!!
   geom_bar(position = "stack", stat = "identity") +
   scale_fill_discrete(type  = pal) +
   theme_bw() 
+```
 
+# Proportion plot based on median concentrations
+
+```{r}
+#chemicals in 50% across all months - median
+p1 <- WB_fifty_percent_dets %>%  
+  group_by(Month, ParameterName) %>%
+  summarize(median = median(Result), n = n(), mean = mean(log10(Result))) %>%
+  mutate(det_freq = n/max(n), prop = median/sum(median)) %>%
+  filter(det_freq > .5) %>%
+  ggplot(aes(x= as.factor(Month), y= prop, color = fct_rev(reorder(ParameterName, prop)), group = ParameterName)) +
+  geom_point(aes(size = n)) +
+  geom_line() +
+  scale_color_discrete(type  = pal_dk) +
+    scale_size_continuous(range=c(0.5,5)) +
+  theme_bw() +
+    theme(text=element_text(size=20))
+
+p2 <- p1 + scale_y_break(c(0.11, 0.15), scales = 0.6, ticklabels=c(0.15, 0.18, 0.21)) + 
+  xlab(NULL) + ylab(NULL) 
+
+p2
 ```
 
 # Correlation of chemicals
@@ -185,8 +220,9 @@ WB_mat_ready <- WB_clean_wide %>%
 
 problems <- pairwiseReport(WB_mat, diagonal = F, cut = 5)
 print(problems, short=F)
+#Problems output shows those chemicals that have less than 5 pairs for a comparison
 
-problem_list_rows <- c("6-methylchrysene", "anthracene", "benzo[a]fluorene", "benzo[a]pyrene", "benzo[b]fluorene", "benzo[ghi]perylene", "benzo[j]fluoranthene", "benzo[k]fluoranthene", "coronene", "cyclopenta[cd]pyrene", "indeno[1,2,3-cd]pyrene", "perylene")
+problem_list_rows <- c("2-methylanthracene", "6-methylchrysene", "anthracene", "benzo[a]fluorene", "benzo[a]pyrene", "benzo[b]fluorene", "benzo[ghi]perylene", "benzo[j]fluoranthene", "benzo[k]fluoranthene", "coronene", "cyclopenta[cd]pyrene", "indeno[1,2,3-cd]pyrene", "perylene")
 
 #removing chemicals with fewer than 5 pairs of observations from the matrix
 (five_pairs <- WB_clean_five_dets %>%
@@ -209,13 +245,295 @@ row.names(logWB_clean_wide) <- paste(logWB_clean_wide$ID, logWB_clean_wide$Month
 
 logWB_chem_corr <- cor(logWB_mat, use="pairwise.complete.obs")
 logWB_pmat <- cor_pmat(logWB_mat,
-  method = "pearson",
+  method = "spearman",
   alternative = "two.sided",
   conf.level = 0.95)
 
 ggcorrplot(logWB_chem_corr, type = "lower") #simple
-ggcorrplot(logWB_chem_corr, hc.order = TRUE, p.mat = logWB_pmat) # uses clustering to re-order chemicals; can set "lab = T" to see numbers; x's show non sig correlation
 
+#Version used in dissertation; categories of PAHs added in PPT (retene, 2-ring PAHs, 3+ ring PAHs, 3-ring PAHs)
+corrplot(logWB_chem_corr, order = 'hclust', addrect = 4, tl.col = 'black', cl.ratio = 0.2, tl.srt = 45, tl.cex = 0.9, p.mat = logWB_pmat, insig = 'blank', tl.offset = 2)
+
+```
+
+# Timeseries number of detections
+
+```{r}
+WB_cleangrp <- WB_clean %>%
+  mutate(Group = ifelse(Month %in% c(2,4,6,8), "1", "2"))
+
+WB_cleangrp %>% # group 1
+  filter(Group == 1) %>%
+  group_by(ID, Month) %>%
+  summarize(sumPAH = sum(Result), nPAH = n()) %>% #sum concentration and number of detections
+  ggplot(aes(x = Month, y = nPAH, color = ID)) +
+  geom_point() +
+  geom_path() +
+  theme_bw()
+
+WB_cleangrp %>% # group 2
+  filter(Group == 2) %>%
+  group_by(ID, Month) %>%
+  summarize(sumPAH = sum(Result), nPAH = n()) %>% #sum concentration and number of detections
+  ggplot(aes(x = Month, y = nPAH, color = ID)) +
+  geom_point() +
+  geom_path() +
+  theme_bw()
+```
+
+## Timeseries concentrations - played with grouping by individual and different chemical categories
+
+```{r}
+# group by individual; G1
+WB_cheminfo %>% 
+  filter(Group == 1) %>%
+  mutate(Type = ifelse(Alkylated == "yes", paste0(Rings,"A"), ifelse(Rings >= 4, "4+", Rings))) %>%
+  group_by(ID, Month, Type, Group) %>%
+  summarize(sumPAH = log10(sum(Result)), nPAH = n()) %>% #sum concentration and number of detections
+  ggplot(aes(x = Month, y = sumPAH, color = Type)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(vars(ID), ncol = 4, scales = "free") +
+    labs(y = "Log10 Sum PAH Concentration (ng/g)", 
+       title = "Sum PAH Concentrations of Repeated Measures \n for Group 1 Faceted by ID")  +
+  theme_bw()
+
+# group by individual; G2
+WB_cheminfo %>% 
+  filter(Group == 2) %>%
+  filter(ID != "SH002", 
+         ID != "SH016",
+         ID != "SH032") %>%  #remove SH002, SH016, and SH032 (only one observation)
+  mutate(Type = ifelse(Alkylated == "yes", paste0(Rings,"A"), ifelse(Rings >= 4, "4+", Rings))) %>%
+  group_by(ID, Month, Type, Group) %>%
+  summarize(sumPAH = log10(sum(Result)), nPAH = n()) %>% #sum concentration and number of detections
+  ggplot(aes(x = Month, y = sumPAH, color = Type)) +
+  geom_point() +
+  geom_path() +
+  facet_wrap(vars(ID), ncol = 4, scales = "free") +
+    labs(y = "Log10 Sum PAH Concentration (ng/g)", 
+       title = "Sum PAH Concentrations of Repeated Measures \n for Group 2 Faceted by ID") +
+  theme_bw()
+
+# create timeseries plots for groups of chemicals
+
+(WB_Name <- WB_cleangrp %>% #create names to match the chem_info data
+  rename("Name" = ParameterName))
+
+(WB_cheminfo <- left_join(WB_Name, chem_info, by ="Name")) 
+
+WB_cheminfo %>% # group 1 - facet by rings (log10 transformed)
+  filter(Group == 1) %>%
+  group_by(ID, Month, Rings) %>%
+  summarize(sumPAH = log10(sum(Result))) %>% #sum concentration and number of detections
+  ggplot(aes(x = Month, y = sumPAH, color = ID)) +
+  geom_point() +
+  geom_path() +
+  facet_wrap(~ Rings) +
+  theme_bw()
+
+WB_cheminfo %>% # group 2 - facet by rings (log10 transformed)
+  filter(Group == 2) %>%
+  group_by(ID, Month, Rings) %>%
+  summarize(sumPAH = log10(sum(Result))) %>% #sum concentration and number of detections
+  ggplot(aes(x = Month, y = sumPAH, color = ID)) +
+  geom_point() +
+  geom_path() +
+  facet_wrap(~ Rings) +
+  theme_bw()
+
+WB_cheminfo %>% # all - facet by rings (log10 transformed) 
+  group_by(ID, Month, Rings) %>%
+  summarize(sumPAH = log10(sum(Result))) %>% #sum concentration and number of detections
+  ggplot(aes(x = Month, y = sumPAH, color = ID)) +
+  geom_point() +
+  geom_path() +
+  facet_wrap(~ Rings) +
+  theme_bw()
+
+WB_cheminfo %>% # group 1 - facet by rings (log10 transformed); combine ring sized 4-7
+  filter(Group == 1) %>%
+  mutate(Size = ifelse(Rings == 2, Rings, ifelse(Rings == 3, Rings, "4+"))) %>%
+  group_by(ID, Month, Size) %>%
+  summarize(sumPAH = log10(sum(Result))) %>% #sum concentration and number of detections
+  ggplot(aes(x = Month, y = sumPAH, color = ID)) +
+  geom_point() +
+  geom_path() +
+  facet_wrap(~ Size) +
+  labs(y = "Log10 Sum PAH Concentration (ng/g)", 
+       title = "Sum PAH Concentrations of Repeated Measures Faceted by Size (# of Rings)") +
+  theme_bw()
+
+WB_cheminfo %>% # group 2 - facet by rings (log10 transformed); combine ring sized 4-7
+  filter(Group == 2) %>%
+  mutate(Size = ifelse(Rings == 2, Rings, ifelse(Rings == 3, Rings, "4+"))) %>%
+  group_by(ID, Month, Size) %>%
+  summarize(sumPAH = log10(sum(Result))) %>% #sum concentration and number of detections
+  ggplot(aes(x = Month, y = sumPAH, color = ID)) +
+  geom_point() +
+  geom_path() +
+  facet_wrap(~ Size) +
+    labs(y = "Log10 Sum PAH Concentration (ng/g)", 
+       title = "Sum PAH Concentrations of Repeated Measures Faceted by Size (# of Rings)") +
+  theme_bw()
+
+WB_cheminfo %>% # all - facet by rings (log10 transformed); combine ring sized 4-7
+  mutate(Size = ifelse(Rings == 2, Rings, ifelse(Rings == 3, Rings, "4+"))) %>%
+  group_by(ID, Month, Size) %>%
+  summarize(sumPAH = log10(sum(Result))) %>% #sum concentration and number of detections
+  ggplot(aes(x = Month, y = sumPAH, color = ID)) +
+  geom_point() +
+  geom_path() +
+  facet_wrap(~ Size) +
+    labs(y = "Log10 Sum PAH Concentration (ng/g)", 
+       title = "Sum PAH Concentrations of Repeated Measures Faceted by Size (# of Rings)") +
+  theme_bw()
+
+WB_cheminfo %>% # facet by group and rings (log10 transformed); combine ring sized 4-7; hide ID
+  mutate(Size = ifelse(Rings == 2, Rings, ifelse(Rings == 3, Rings, "4+"))) %>%
+  group_by(ID, Month, Size, Group) %>%
+  summarize(sumPAH = log10(sum(Result)), nPAH = n()) %>% #sum concentration and number of detections
+  ggplot(aes(x = Month, y = sumPAH, color = ID)) +
+  geom_point(show.legend = FALSE) +
+  geom_path(show.legend = FALSE) +
+  facet_grid(rows = vars(Size), cols = vars(Group)) +
+    labs(y = "Log10 Sum PAH Concentration (ng/g)", 
+       title = "Sum PAH Concentrations of Repeated Measures Faceted by Sampling Group (Cols) and # of Rings (Rows)") +
+  theme_bw()
+
+WB_cheminfo %>% # facet by group and rings + alkylation (log10 transformed)
+  mutate(Type = ifelse(Alkylated == "yes", paste0(Rings,"A"), ifelse(Rings >= 4, "4+", Rings))) %>%
+  group_by(ID, Month, Type, Group) %>%
+  summarize(sumPAH = log10(sum(Result))) %>% #sum concentration and number of detections
+  ggplot(aes(x = Month, y = sumPAH, color = ID)) +
+  geom_point(show.legend = FALSE) +
+  geom_path(show.legend = FALSE) +
+  facet_grid(rows = vars(Type), cols = vars(Group), scales = "free") +
+    labs(y = "Log10 Sum PAH Concentration (ng/g)", 
+       title = "Sum PAH Concentrations of Repeated Measures \n Faceted by Sampling Group (Cols) and # of Rings + Alkylation (Rows)") +
+  theme_bw()
+
+WB_cheminfo %>% # facet by group and rings+ alkylation (log10 transformed); no SH018
+  filter(ID != "SH018") %>%
+  mutate(Type = ifelse(Alkylated == "yes", paste0(Rings,"A"), ifelse(Rings >= 4, "4+", Rings))) %>%
+  group_by(ID, Month, Type, Group) %>%
+  summarize(sumPAH = log10(sum(Result)), nPAH = n()) %>% #sum concentration and number of detections
+  ggplot(aes(x = Month, y = sumPAH, color = ID)) +
+  geom_point(show.legend = FALSE) +
+  geom_path(show.legend = FALSE) +
+  facet_grid(rows = vars(Type), cols = vars(Group), scales = "free") +
+    labs(y = "Log10 Sum PAH Concentration (ng/g)", 
+       title = "Sum PAH Concentrations of Repeated Measures \n Faceted by Sampling Group (Cols) and # of Rings + Alkylation (Rows)") +
+  theme_bw()
+
+WB_cheminfo %>% # all; just retene
+  filter(Name == "retene") %>%
+  ggplot(aes(x = Month, y = log10(Result), color = ID)) +
+  geom_point(show.legend = FALSE) +
+  geom_path(show.legend = FALSE) +
+  facet_grid(cols = vars(Group), scales = "free") +
+    labs(y = "Log10 Retene Concentration (ng/g)", 
+       title = "Retene Concentrations of Repeated Measures Faceted by Sampling Group") +
+  theme_bw()
+
+```
+
+## Timeseries boxplots - by number of rings and alkylation
+
+```{r}
+#WB_cheminfo created in chunk above
+
+WB_cheminfo %>% # all - facet by rings (log10 transformed)
+  group_by(ID, Month, Rings) %>%
+  summarize(sumPAH = log10(sum(Result)), nPAH = n()) %>% #sum concentration and number of detections
+  ggplot(aes(x = as.factor(Month), y = sumPAH)) +
+  geom_boxplot() +
+  facet_wrap(~ Rings) +
+  theme_bw()
+
+WB_cheminfo %>% # all - facet by rings (log10 transformed); combine ring sized 4-7
+  mutate(Size = ifelse(Rings == 2, Rings, ifelse(Rings == 3, Rings, "4+"))) %>%
+  group_by(ID, Month, Size) %>%
+  summarize(sumPAH = log10(sum(Result)), nPAH = n()) %>% #sum concentration and number of detections
+  ggplot(aes(x = as.factor(Month), y = sumPAH)) +
+  geom_boxplot() +
+  facet_wrap(~ Size) +
+    labs(y = "Log10 Sum PAH Concentration (ng/g)", 
+       title = "Sum PAH Concentrations of Repeated Measures Faceted by Size (# of Rings)") +
+  theme_bw()
+
+WB_cheminfo$Month <-as.factor(WB_cheminfo$Month)
+WB_cheminfo$Month <- recode(WB_cheminfo$Month, '2' = "Nov", '3' = "Dec", '4' = "Jan", '5' = "Feb", '6' = "Mar", '7' = "Apr", '8' = "May", '9' = "Jun")
+
+p1 <- WB_cheminfo %>% # facet by group and rings+ alkylation (log10 transformed); COLOR ID
+  mutate(Type = ifelse(Alkylated == "yes", paste0(Rings," Alkylated"), ifelse(Rings >= 4, "4+", Rings))) %>%
+  group_by(ID, Month, Type, Group) %>%
+  summarize(sumPAH = log10(sum(Result)), nPAH = n()) %>% #sum concentration and number of detections
+  filter(str_detect(Type, "2")) %>%
+  ggplot(aes(x = Month, y = sumPAH)) +
+  geom_boxplot() +
+  facet_wrap(~Type, scales = "free", ncol = 2) +
+    labs(x = "",
+         y = element_blank()) +
+  theme_bw() +
+  theme(panel.spacing = unit(0.7, "cm")) 
+
+p2 <- WB_cheminfo %>% # facet by group and rings+ alkylation (log10 transformed); COLOR ID
+  mutate(Type = ifelse(Alkylated == "yes", paste0(Rings," Alkylated"), ifelse(Rings >= 4, "4+", Rings))) %>%
+  group_by(ID, Month, Type, Group) %>%
+  summarize(sumPAH = log10(sum(Result)), nPAH = n()) %>% #sum concentration and number of detections
+  filter(str_detect(Type, "3")) %>%
+  ggplot(aes(x = Month, y = sumPAH)) +
+  geom_boxplot() +
+  facet_wrap(~Type, scales = "free", ncol = 2) +
+    labs(y = "Log10 Sum PAH Concentration (ng/g)", 
+         x = "") +
+  theme_bw() +
+  theme(panel.spacing = unit(0.7, "cm")) 
+
+p4 <- WB_cheminfo %>% # facet by group and rings+ alkylation (log10 transformed); COLOR ID
+  mutate(Type = ifelse(Alkylated == "yes", paste0(Rings," Alkylated"), ifelse(Rings >= 4, "4+", Rings))) %>%
+  group_by(ID, Month, Type, Group) %>%
+  summarize(sumPAH = log10(sum(Result)), nPAH = n()) %>% #sum concentration and number of detections
+  filter(str_detect(Type, "4")) %>%
+  ggplot(aes(x = Month, y = sumPAH)) +
+  geom_boxplot() +
+  facet_wrap(~factor(Type, levels=c('4+', '4 Alkylated')), scales = "free", ncol = 2) +
+    labs(x = "Month of Sampling",
+         y = element_blank()) +
+  theme_bw() +
+  theme(panel.spacing = unit(0.7, "cm")) 
+
+WB_cheminfo$nicetitle = "3 Alkylated (Retene)"
+
+p3 <- WB_cheminfo %>% # just retene
+  filter(Name == "retene") %>%
+  ggplot(aes(x =Month, y = log10(Result))) +
+  geom_boxplot() +
+  facet_wrap(~nicetitle) +
+    labs(y = element_blank(),
+         x = element_blank()) +
+  theme_bw()
+
+layout <- "
+AA#
+BBC
+DD#
+"
+p1 + p2 + p3 + p4 + 
+  plot_layout(design = layout)
+
+```
+
+# PCA Plot
+
+```{r}
+loadings <- read.csv("PCA_Loadings.csv")
+scores <- read.csv("PCA_Scores.csv")
+
+ggplot(scores, aes(PC1, PC2)) +
+  geom_point() +
+  theme_bw()
 ```
 
 # Quick Look into high concentrations (looks like mostly in group 1)
@@ -270,9 +588,9 @@ WB_clean_thirty_dets <- subset(WB_clean, ParameterName %in% chemical_list30)
 
 WB_clean_thirty_dets %>% #by month; group 1 much more variable
   group_by(ParameterName, Month) %>%
-  summarize(CV = (sd(Result)/mean(Result))*100) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
   filter(!is.na(CV)) %>%
-  ggplot(aes(x = CV, y = reorder(ParameterName, CV))) +
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
   geom_point() +
   geom_vline(xintercept = 100) +
   facet_grid(~ Month) + 
@@ -285,9 +603,9 @@ WB_clean_thirty_dets %>% #group 1
            Month == 6|
            Month == 8) %>%
   group_by(ParameterName, Month) %>%
-  summarize(CV = (sd(Result)/mean(Result))*100) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
   filter(!is.na(CV)) %>%
-  ggplot(aes(x = CV, y = reorder(ParameterName, CV))) +
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
   geom_point() +
     geom_vline(xintercept = 100) +
   facet_grid(~Month,) + 
@@ -300,9 +618,9 @@ WB_clean_thirty_dets %>% #group 2
            Month == 7|
            Month == 9) %>%
   group_by(ParameterName, Month) %>%
-  summarize(CV = (sd(Result)/mean(Result))*100) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
   filter(!is.na(CV)) %>%
-  ggplot(aes(x = CV, y = reorder(ParameterName, CV))) +
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
   geom_point() +
     geom_vline(xintercept = 100) +
   facet_grid(~Month,) + 
@@ -331,9 +649,9 @@ WB_clean_thirty_dets %>% #boxplot by ID - individual CVs
 
 WB_clean_thirty_dets %>% #all samples combined
   group_by(ParameterName) %>%
-  summarize(CV = (sd(Result)/mean(Result))*100) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
   filter(!is.na(CV)) %>%
-  ggplot(aes(x = CV, y = reorder(ParameterName, CV))) +
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
   geom_point() + 
     geom_vline(xintercept = 100) +
   labs(x = "Coefficient of Variation (%)", y = NULL) +
@@ -354,9 +672,9 @@ WB_clean_thirty_dets <- subset(WB_clean, ParameterName %in% chemical_list30)
 WB_clean_thirty_dets %>% #by month; group 1 much more variable
   filter(ID != "SH018") %>%
   group_by(ParameterName, Month) %>%
-  summarize(CV = (sd(Result)/mean(Result))*100) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
   filter(!is.na(CV)) %>%
-  ggplot(aes(x = CV, y = reorder(ParameterName, CV))) +
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
   geom_point() +
   geom_vline(xintercept = 100) +
   facet_grid(~ Month) + 
@@ -370,9 +688,9 @@ WB_clean_thirty_dets %>% #group 1
            Month == 6|
            Month == 8) %>%
   group_by(ParameterName, Month) %>%
-  summarize(CV = (sd(Result)/mean(Result))*100) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n=n()) %>%
   filter(!is.na(CV)) %>%
-  ggplot(aes(x = CV, y = reorder(ParameterName, CV))) +
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
   geom_point() +
     geom_vline(xintercept = 100) +
   facet_grid(~Month,) + 
@@ -393,9 +711,9 @@ WB_clean_thirty_dets %>% #boxplot by ID - individual CVs
 WB_clean_thirty_dets %>% #combined
   filter(ID != "SH018") %>%
   group_by(ParameterName) %>%
-  summarize(CV = (sd(Result)/mean(Result))*100) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
   filter(!is.na(CV)) %>%
-  ggplot(aes(x = CV, y = reorder(ParameterName, CV))) +
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
   geom_point() + 
     geom_vline(xintercept = 100) +
   labs(x = "Coefficient of Variation (%)", y = NULL) +
@@ -406,7 +724,7 @@ WB_clean_thirty_dets %>% #combined
 (CV_Name <- WB_clean_thirty_dets %>% #create names to match the chem_info data
   filter(ID != "SH018") %>%
   group_by(ParameterName) %>%
-  summarize(CV = (sd(Result)/mean(Result))*100) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
   filter(!is.na(CV)) %>%
   rename("Name" = ParameterName))
 
@@ -414,21 +732,21 @@ WB_clean_thirty_dets %>% #combined
 (CV_cheminfo <- left_join(CV_Name, cheminfo_30WBdets, by ="Name")) 
 
 #relationship between MW and CV
-ggplot(CV_cheminfo, aes(x = CV, y = reorder(Name, MW))) +
+ggplot(CV_cheminfo, aes(x = CV, y = reorder(Name, MW), color = n)) +
   geom_point() + 
     geom_vline(xintercept = 100) +
   labs(x = "Coefficient of Variation (%)", y = NULL) +
   theme_bw()
 
 #show rings and CV (organized by M.W.)
-ggplot(CV_cheminfo, aes(x = CV, y = reorder(Name, MW))) +
-  geom_point(aes(size = ALL_CV$Rings)) + 
+ggplot(CV_cheminfo, aes(x = CV, y = reorder(Name, MW), color = n)) +
+  geom_point(aes(size = Rings)) + 
     geom_vline(xintercept = 100) +
   labs(x = "Coefficient of Variation (%)", y = NULL) +
   theme_bw()
 
 #relationship between koa (octanol, air partitioning coefficient) and CV
-ggplot(CV_cheminfo, aes(x = CV, y = reorder(Name, `log Koa`))) +
+ggplot(CV_cheminfo, aes(x = CV, y = reorder(Name, `log Koa`), color = n)) +
   geom_point() + 
     geom_vline(xintercept = 100) +
   labs(x = "Coefficient of Variation (%)", y = NULL) +
@@ -448,9 +766,9 @@ WB_clean_ten_dets <- subset(WB_clean, ParameterName %in% chemical_list10)
 
 WB_clean_ten_dets %>% #by month; group 1 much more variable
   group_by(ParameterName, Month) %>%
-  summarize(CV = (sd(Result)/mean(Result))*100) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
   filter(!is.na(CV)) %>%
-  ggplot(aes(x = CV, y = reorder(ParameterName, CV))) +
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
   geom_point() +
   geom_vline(xintercept = 100) +
   facet_grid(~ Month) + 
@@ -463,9 +781,9 @@ WB_clean_ten_dets %>% #group 1
            Month == 6|
            Month == 8) %>%
   group_by(ParameterName, Month) %>%
-  summarize(CV = (sd(Result)/mean(Result))*100) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
   filter(!is.na(CV)) %>%
-  ggplot(aes(x = CV, y = reorder(ParameterName, CV))) +
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
   geom_point() +
     geom_vline(xintercept = 100) +
   facet_grid(~Month,) + 
@@ -478,9 +796,9 @@ WB_clean_ten_dets %>% #group 2
            Month == 7|
            Month == 9) %>%
   group_by(ParameterName, Month) %>%
-  summarize(CV = (sd(Result)/mean(Result))*100) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
   filter(!is.na(CV)) %>%
-  ggplot(aes(x = CV, y = reorder(ParameterName, CV))) +
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
   geom_point() +
     geom_vline(xintercept = 100) +
   facet_grid(~Month,) + 
@@ -509,9 +827,9 @@ WB_clean_ten_dets %>% #boxplot by ID - individual CVs
 
 WB_clean_ten_dets %>% #combined
   group_by(ParameterName) %>%
-  summarize(CV = (sd(Result)/mean(Result))*100) %>%
+  summarize(CV = (sd(Result)/mean(Result))*100, n = n()) %>%
   filter(!is.na(CV)) %>%
-  ggplot(aes(x = CV, y = reorder(ParameterName, CV))) +
+  ggplot(aes(x = CV, y = reorder(ParameterName, CV), color = n)) +
   geom_point() + 
     geom_vline(xintercept = 100) +
   labs(x = "Coefficient of Variation (%)", y = NULL) +
@@ -519,3 +837,213 @@ WB_clean_ten_dets %>% #combined
 
 ```
 
+# First look at time outside and open windows
+
+```{r}
+freshair <- monthly_meta %>%
+  separate(Sample, c("ID", "Type", "Month")) %>%
+  filter(Type == "WB") %>%
+  mutate(Month = as.numeric(Month))
+
+#calculate sum PAHs
+WB_sum_PAH <- WB_clean %>%
+  group_by(ID, Month) %>%
+  summarize(sumPAH = sum(Result), nPAH = n())
+
+freshair_WB <- left_join(WB_sum_PAH, freshair, by =c("Month", "ID"))
+freshair_WB
+
+#first, how did proportion of time spent outside change? Omitting NAs
+freshair_WB %>%
+  filter(Outside_bin != "NA") %>%
+  ggplot(aes(x = Month, fill = Outside_bin)) +
+  geom_bar(position = "fill") 
+
+#With windows open? Omitting NAs
+freshair_WB %>%
+  filter(Window_bin != "NA") %>%
+  ggplot(aes(x = Month, fill = Window_bin)) +
+  geom_bar(position = "fill") 
+```
+
+# Windrose
+
+```{r}
+library("clifro")
+
+weather$Month <- as.factor(weather$Month)
+windrose(speed = weather$AvgWindSp_mph, direction = weather$AvgWindDir, facet = weather$Month, n_col = 3)
+windrose(speed = weather$AvgWindSp_mph, direction = weather$AvgWindDir)
+```
+
+# Summary Table - Questionnaire Responses
+
+```{r}
+#filter out participants that didn't return any samples
+  
+part_trim <- part %>%
+  filter(ID != "SH022",
+         ID != "SH023") 
+
+t <- tplyr_table(part_trim, Group) %>% #could add cols = Type to further separate into air and WB-only participants; or remove "Group" for combined
+  add_total_group()
+
+# general demographics
+l1 <- group_count(t, Age, by = "Age")
+l2 <- group_count(t, Gender, by= "Gender")
+l3 <- group_count(t, Race, by= "Race")
+l4 <- group_count(t, Ethnicity, by= "Ethnicity")
+l5 <- group_count(t, Education, by= "Education")
+l6 <- group_count(t, Income, by= "Income")
+
+dem <- t %>%
+  add_layers(l1, l2, l3, l4, l5, l6) %>% #can add layers here as a list
+  build() %>%
+  kable()
+ 
+write.table(dem, "demographics.csv")
+
+#housing characteristics
+h1 <- group_count(t, HouseAgeBin, by= "HouseAge")
+h2 <- group_count(t, Odor, by= "Odor")
+h3 <- group_count(t, AC, by= "AC")
+h4 <- group_count(t, Flooring, by= "Flooring")
+h5 <- group_count(t, Garage, by= "Garage")
+
+#home cleaning, combustion, and fragrances
+c1 <- group_count(t, Vacuum, by= "Vacuum")
+c2 <- group_count(t, Mop, by= "Mop")
+c3 <- group_count(t, vars(AirFreshener, AFCount), by= "AirFresh")
+c4 <- group_count(t, Candles, by= "Candles")
+c5 <- group_count(t, vars(AirFilter, AirFilterFreq), by= "AirFilter")
+c6 <- group_count(t, vars(Fireplace, FireplaceTemp), by= "Fireplace")
+c7 <- group_count(t, BackyardBurn, by= "BackyardBurn")
+c8 <- group_count(t, WoodStove, by= "WoodStove")
+c9 <- group_count(t, GasStove, by= "GasStove")
+c10 <- group_count(t, Grill, by= "Grill")
+
+#other habits and behaviors
+b1 <- group_count(t, Bonfires, by= "Bonfires")
+b2 <- group_count(t, Time_away, by= "Time_away")
+b3 <- group_count(t, vars(Smoke, SmokeLoc), by= "Smoking") #smoke is the outside var and smokeloc is a subset (includes total for smokers + loc)
+b4 <- group_count(t, vars(Smoke, SmokeType), by= "SmokeType") #redundant, but I want the subset I think
+b5 <- group_count(t, vars(SmokeSH, SmokeLocSH), by= "SmokingSH")
+b6 <- group_count(t, vars(Machinery, MachineryType), by= "Machinery")
+b7 <- group_count(t, PAHOccupation, by = "PAHOccupation")
+
+home_behaviors <- t %>%
+  add_layers(h1,h2,h3,h4,h5,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,b1,b2,b3,b4,b5,b6,b7) %>% #can add layers here as a list
+  build() %>%
+  kable()
+ 
+write.table(home_behaviors, "home_behaviors.csv")
+
+#table for monthly outdoor and window data
+
+(Freshair_grp <- freshair %>%
+  mutate(Group = ifelse(Month %in% c(2,4,6,8), "1", "2")))
+
+f <- tplyr_table(Freshair_grp, Month) %>% 
+  add_total_group()
+
+#layers
+o1 <- group_count(f, Outside_bin, by= "Outside")
+o2 <- group_count(f, Window_bin, by= "Window_open")
+
+fresh_table <- f %>%
+  add_layers(o1,o2) %>% 
+  build() %>%
+  kable()
+
+write.table(fresh_table, "Fresh_Air.csv")
+
+```
+
+# Summary Table - Wristband PAH Data
+
+```{r}
+#WB data currently in ng/g
+WBD
+(WB_clean <- WBD %>%
+  filter(Name != "SH044_WB_08",
+         Name != "SH045_WB_08") %>% # samples to omit
+   filter(ParameterName != "benz[a]anthracene",
+          ParameterName != "benz[j] and [e]aceanthrylene",
+          ParameterName != "2,6-dimethylnaphthalene",
+          ParameterName != "2,6-diethylnaphthalene") %>% #analytes to omit
+  separate(Name, into = c("ID", "Type", "Month")) %>%
+  select(ID, Month, ParameterName, Result, Flag) %>%
+  mutate(Flag = replace_na(Flag, "D")) %>% #D represents detections
+  filter(Flag != "U"))
+
+(WB_clean_44 <- WBD %>% #don't omit 44 and 45
+   filter(ParameterName != "benz[a]anthracene",
+          ParameterName != "benz[j] and [e]aceanthrylene",
+          ParameterName != "2,6-dimethylnaphthalene",
+          ParameterName != "2,6-diethylnaphthalene") %>% #analytes to omit
+  separate(Name, into = c("ID", "Type", "Month")) %>%
+  select(ID, Month, ParameterName, Result, Flag) %>%
+  mutate(Flag = replace_na(Flag, "D")) %>% #D represents detections
+  filter(Flag != "U"))
+
+# This data excludes all U flags (non-detects) but includes all J-flags; SH044_WB_08 and SH045_WB_08 are excluded; analytes benz[a]anthracene, benz[j] and [e]aceanthrylene, 2,6-dimethylnaphthalene, and 2,6-diethylnaphthalene are excluded.
+
+# Samples per time point (160 total):
+WB_clean %>%
+  select(ID, Month) %>%
+  distinct() %>%
+  group_by(Month) %>%
+  summarize(n())
+
+# Summary table (by month):
+WB_table <- WB_clean %>%
+  group_by(Month, ParameterName) %>%
+  summarize(mean = mean(Result), geom_mean = exp(mean(log(Result))), geoSD = geoSD(Result), median = median(Result), sd = sd(Result), n = n(), min = min(Result), max = max(Result), Q1 = quantile(Result, 0.25), Q3 = quantile(Result, 0.75)) %>% 
+  mutate(se = sd/sqrt(n)) %>%
+  mutate(det_freq = n/max(n)) %>% #at least one analyte is detected in all samples in all months, so max(n) = the number of samples in the group
+  dplyr::select(-sd) %>%
+  pivot_wider(names_from = Month, values_from = c(n, det_freq, mean, se, geom_mean, geoSD, min, Q1, median, Q3, max), names_vary = "slowest")
+
+WB_table <- WB_table[order(rev(WB_table$n_02)),]
+WB_table
+
+#50 chemicals detected across all timepoints
+
+write_delim(WB_table, file = "WB_Data.csv", delim = "@")
+
+# Summary of flags in each of these months as well
+WBflag_table <- WB_clean %>%
+  select(ParameterName, Month, Flag) %>%
+  group_by(Month, ParameterName, Flag) %>%
+  summarize(Count = n()) %>%
+  pivot_wider(names_from = Flag, values_from = Count, values_fill = 0) %>%
+  mutate(J = J + JB) %>% # JB flags are both flags applied to the same sample, this is adding these to total J-flags.
+  select(-JB) %>%
+  pivot_wider(names_from = Month, values_from = c(B,J), names_vary = "slowest", values_fill = 0)
+
+write_delim(WBflag_table, file = "WBflag_Data.csv", delim = "@")
+
+
+# Summary table across all months
+# Numeric
+WB_table2 <- WB_clean %>%
+  group_by(ParameterName) %>%
+  summarize(mean = mean(Result), geom_mean = exp(mean(log(Result))), geoSD = geoSD(Result), median = median(Result), sd = sd(Result), n = n(), min = min(Result), max = max(Result), Q1 = quantile(Result, 0.25), Q3 = quantile(Result, 0.75)) %>% 
+  mutate(se = sd/sqrt(n)) %>%
+  mutate(det_freq = n/max(n)) %>% #at least one analyte is detected in all samples in all months, so max(n) = the number of samples in the group
+  dplyr::select(-sd) 
+
+WB_table2 <- WB_table2[order(rev(WB_table2$n)),]
+write_delim(WB_table2, file = "WB_Data2.csv", delim = "@")
+
+# Summary of flags 
+WBflag_table2 <- WB_clean %>%
+  select(ParameterName, Flag) %>%
+  group_by(ParameterName, Flag) %>%
+  summarize(Count = n()) %>%
+  pivot_wider(names_from = Flag, values_from = Count, values_fill = 0) %>%
+  mutate(J = J + JB) %>% # JB flags are both flags applied to the same sample, this is adding these to total J-flags.
+  select(-JB) 
+
+WBflag_table2 <- WBflag_table2[order(rev(WBflag_table2$D)),]
+write_delim(WBflag_table2, file = "WBflag_Data2.csv", delim = "@")
